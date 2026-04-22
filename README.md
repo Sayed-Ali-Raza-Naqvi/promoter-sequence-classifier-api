@@ -73,14 +73,17 @@ docker run -p 8000:8000 promoter-classifier
 
 ## API Endpoints
 
-### POST /classify
+All endpoints use the `/api/v1/` prefix.
+
+### POST /api/v1/classify
+Classify a single DNA sequence.
+
 ```bash
-curl -X POST http://localhost:8000/classify \
+curl -X POST http://localhost:8000/api/v1/classify \
   -H "Content-Type: application/json" \
   -d '{"sequence": "ATCG...600bp"}'
 ```
 
-<<<<<<< HEAD
 Response:
 ```json
 {
@@ -94,19 +97,36 @@ Response:
 }
 ```
 
-### POST /batch
+### POST /api/v1/batch_classify
+Classify multiple sequences (up to 100 per request).
+
 ```bash
-curl -X POST http://localhost:8000/batch \
+curl -X POST http://localhost:8000/api/v1/batch_classify \
   -H "Content-Type: application/json" \
   -d '{"sequences": ["ATCG...600bp", "GCTA...600bp"]}'
 ```
 
-### GET /health
+### POST /api/v1/classify_file
+Classify sequences from a FASTA file.
+
 ```bash
-curl http://localhost:8000/health
+curl -X POST http://localhost:8000/api/v1/classify_file \
+  -F "file=@sequences.fasta"
 ```
 
-## Interactive Docs
+Supported file formats: `.fa`, `.fasta`, `.txt`  
+Maximum 100 sequences per file.
+
+### GET /api/v1/health
+Health check and model status.
+
+```bash
+curl http://localhost:8000/api/v1/health
+```
+
+## Interactive Documentation
+
+Visit the interactive API docs:
 ```
 http://localhost:8000/docs
 ```
@@ -129,4 +149,3 @@ http://localhost:8000/docs
 - pydantic==2.7.1
 - requests==2.31.0
 - jupyter==1.0.0
-    
