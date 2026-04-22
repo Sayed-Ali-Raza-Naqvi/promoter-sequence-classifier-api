@@ -116,7 +116,7 @@ http://localhost:8000/docs
 - Attention visualization to highlight informative positions
 - Multi-species promoter support
 - ONNX export for faster CPU inference
-=======
+
 ## Dependencies
 
 - torch==2.2.2
