@@ -23,8 +23,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Promoter Sequence Classifier API",
     description=(
-        "1D CNN trained on EPDnew human promoter sequences. "
-        "Classifies 600 bp DNA windows as promoter or non-promoter."
+        "1D CNN classifier trained on EPDnew human promoter sequences. "
+        "Accepts DNA sequences between 500–600+ bp and classifies as "
+        "promoter or non-promoter with confidence score."
     ),
     version="1.0.0",
     lifespan=lifespan
@@ -38,13 +39,15 @@ class SequenceRequest(BaseModel):
     @classmethod
     def validate_sequence(cls, v: str) -> str:
         v = v.upper().strip()
-        valid_bases = set("ACGT")
         
-        invalid_bases = set(v) - valid_bases
-        if invalid_bases:
-            raise ValueError(f"Sequence contains invalid bases: {invalid_bases}")
-
+        if len(v) == 0:
+            raise ValueError("Sequence cannot be empty.")
+        
+        if " " in v:
+            raise ValueError("Sequence cannot contain spaces.")
+        
         return v
+
     
 
 class BatchRequest(BaseModel):
@@ -65,8 +68,10 @@ class PredictionResponse(BaseModel):
     label: str
     confidence: float
     probability: float
-    length: int
-    time_ms: Optional[float] = None
+    original_length: int
+    processed_length: int
+    warning: Optional[str]
+    time_ms: float
 
 
 class BatchResponse(BaseModel):
@@ -82,10 +87,11 @@ def root():
 
 @app.get("/health")
 def health_check():
-    return {
+     return {
         "status": "ok",
-        "model_loaded": model_store.get("model") is not None,
-        "sequence_length_expected": SEQUENCE_LENGTH,
+        "model_loaded": "model" in model_store,
+        "accepted_length_range": f"{500}–{SEQUENCE_LENGTH}+ bp",
+        "trained_on": f"{SEQUENCE_LENGTH} bp EPDnew human promoters"
     }
 
 
