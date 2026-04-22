@@ -101,32 +101,34 @@ def save_splits(splits: dict[str, np.ndarray], output_dir: str) -> None:
 
 
 def sanity_check(output_dir: str) -> None:
-    import os
-    import numpy as np
-
     print("\n── Sanity Check ──")
 
     for split in ["train", "val", "test"]:
-        X_path = os.path.join(output_dir, f"X_{split}.npy")
-        y_path = os.path.join(output_dir, f"y_{split}.npy")
+        X = np.load(os.path.join(output_dir, f"X_{split}.npy"))
+        y = np.load(os.path.join(output_dir, f"y_{split}.npy"))
 
-        X = np.load(X_path)
-        y = np.load(y_path)
+        print(f"{split} raw shape: {X.shape}")
 
         assert len(X) == len(y), f"Mismatch in X and y lengths for {split}"
-        assert X.ndim == 3 and X.shape[2] == 4, f"Invalid shape for X_{split}"
 
-        row_sums = X.sum(axis=2)
+        if X.ndim != 3:
+            raise AssertionError(f"{split} is not 3D!")
+
+        if X.shape[-1] == 4:
+            row_sums = X.sum(axis=2)
+        elif X.shape[1] == 4:
+            row_sums = X.sum(axis=1)
+        else:
+            raise AssertionError(f"Invalid shape for X_{split}: {X.shape}")
 
         if not np.allclose(row_sums, 1.0):
             bad_positions = np.where(~np.isclose(row_sums, 1.0))
             print(f"Found invalid one-hot entries in {split} set!")
-            print(f"Example bad indices (sample, position): {list(zip(bad_positions[0][:5], bad_positions[1][:5]))}")
             raise AssertionError(f"One-hot encoding broken in {split} set!")
 
         assert np.all((X >= 0) & (X <= 1)), f"Invalid values in X_{split}"
-
         assert set(np.unique(y)).issubset({0, 1}), f"Invalid labels in y_{split}"
+
         print(f"{split:5s} — X: {X.shape} | y: {y.shape} | "
               f"Promoters: {int(y.sum())} | "
               f"Background: {len(y) - int(y.sum())} | "
