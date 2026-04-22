@@ -5,7 +5,7 @@ import numpy as np
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 from model import PromoterCNN
-from utils import one_hot_encode, is_valid_sequence, SEQUENCE_LENGTH
+from utils import one_hot_encode, normalize_sequence, SEQUENCE_LENGTH
 
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), '..', 'models', 'cnn_promoter.pt')
@@ -26,14 +26,11 @@ def load_model() -> PromoterCNN:
 
 def predict_sequence(sequence: str, model: PromoterCNN) -> dict:
     sequence = sequence.upper().strip()
+    original_length = len(sequence)
 
-    if not is_valid_sequence(sequence):
-        raise ValueError(
-            f"Invalid sequence. Must be {SEQUENCE_LENGTH} characters long and contain only A, C, G, T."
-            f"Got length {len(sequence)}: {sequence}"
-        )
+    normalized_seq, warning = normalize_sequence(sequence)
     
-    encoded = one_hot_encode(sequence)
+    encoded = one_hot_encode(normalized_seq)
     encoded_tensor = torch.tensor(encoded, dtype=torch.float32).unsqueeze(0).to(DEVICE)
 
     with torch.no_grad():
@@ -47,7 +44,9 @@ def predict_sequence(sequence: str, model: PromoterCNN) -> dict:
         "label": label,
         "confidence": round(confidence, 4),
         "probability": round(probability, 4),
-        "length": len(sequence),
+        "original_length": original_length,
+        "processed_length": SEQUENCE_LENGTH,
+        "warning": warning
     }
 
 
@@ -55,19 +54,15 @@ def batch_predict(sequences: list[str], model: PromoterCNN) -> list[dict]:
     results = []
 
     for i, seq in enumerate(sequences):
-        seq = seq.upper().strip()
-
-        if not is_valid_sequence(seq):
+        try:
+            result = predict_sequence(seq, model)
+            result["index"] = i
+            results.append(result)
+        except ValueError as e:
             results.append({
                 "index": i,
                 "label": "error",
-                "message": f"Invalid sequence at index {i}: length={len(seq)}"
+                "message": str(e)
             })
-
-            continue
-
-        result = predict_sequence(seq)
-        result["index"] = i
-        results.append(result)
 
     return results
