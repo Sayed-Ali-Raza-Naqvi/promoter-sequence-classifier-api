@@ -18,11 +18,11 @@ def is_valid_sequence(seq: str) -> bool:
 def one_hot_encode(seq: str) -> np.ndarray:
     seq = seq.upper()
     L = len(seq)
-    one_hot = np.zeros((L, 4), dtype=np.float32)
+    one_hot = np.zeros((4, L), dtype=np.float32)
 
     for i, base in enumerate(seq):
         if base in BASE_TO_INDEX:
-            one_hot[i, BASE_TO_INDEX[base]] = 1.0
+            one_hot[BASE_TO_INDEX[base], i] = 1.0
 
     return one_hot
 
