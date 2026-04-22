@@ -196,9 +196,3 @@ promoter-sequence-classifier-api/
 - pydantic==2.7.1
 - requests==2.31.0
 - jupyter==1.0.0
-
-If you use this model in your research, please cite:
-
-```
-[Add citation information]
-```
