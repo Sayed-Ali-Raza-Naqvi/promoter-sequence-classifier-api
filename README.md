@@ -116,7 +116,7 @@ http://localhost:8000/docs
 - Attention visualization to highlight informative positions
 - Multi-species promoter support
 - ONNX export for faster CPU inference
-=======
+
 ## Dependencies
 
 - torch==2.2.2
@@ -129,4 +129,4 @@ http://localhost:8000/docs
 - pydantic==2.7.1
 - requests==2.31.0
 - jupyter==1.0.0
->>>>>>> 91f8ee53d875dcae51ab91181e1ea5d07f7d388c
+    
