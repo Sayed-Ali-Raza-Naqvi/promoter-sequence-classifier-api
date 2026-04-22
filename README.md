@@ -80,6 +80,7 @@ curl -X POST http://localhost:8000/classify \
   -d '{"sequence": "ATCG...600bp"}'
 ```
 
+<<<<<<< HEAD
 Response:
 ```json
 {
@@ -115,3 +116,17 @@ http://localhost:8000/docs
 - Attention visualization to highlight informative positions
 - Multi-species promoter support
 - ONNX export for faster CPU inference
+=======
+## Dependencies
+
+- torch==2.2.2
+- numpy==1.26.4
+- biopython==1.83
+- scikit-learn==1.4.2
+- matplotlib==3.8.4
+- fastapi==0.111.0
+- uvicorn==0.29.0
+- pydantic==2.7.1
+- requests==2.31.0
+- jupyter==1.0.0
+>>>>>>> 91f8ee53d875dcae51ab91181e1ea5d07f7d388c
