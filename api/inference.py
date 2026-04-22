@@ -25,7 +25,7 @@ def load_model() -> PromoterCNN:
 
 
 def predict_sequence(sequence: str, model: PromoterCNN) -> dict:
-    sequence = sequence.upper().strip()
+    sequence = sequence.replace('\n', '').replace('\r', '').replace(' ', '').upper().strip()
     original_length = len(sequence)
 
     normalized_seq, warning = normalize_sequence(sequence)
