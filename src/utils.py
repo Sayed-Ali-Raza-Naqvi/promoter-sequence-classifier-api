@@ -9,6 +9,7 @@ BASE_TO_INDEX = {
 }
 VALID_BASES = set(BASE_TO_INDEX.keys())
 SEQUENCE_LENGTH = 600
+MIN_LENGTH = 500
 
 def is_valid_sequence(seq: str) -> bool:
     seq = seq.upper()
@@ -27,6 +28,59 @@ def one_hot_encode(seq: str) -> np.ndarray:
     return one_hot
 
 
+def pad_sequence(seq: str, target_length: int = SEQUENCE_LENGTH) -> str:
+    seq = seq.upper().strip()
+    total_pad = target_length - len(seq)
+    left_pad = total_pad // 2
+    right_pad = total_pad - left_pad
+
+    return 'N' * left_pad + seq + 'N' * right_pad
+
+
+def trim_to_center(seq: str, target_length: int = SEQUENCE_LENGTH) -> str:
+    seq = seq.upper().strip()
+    start = (len(seq) - target_length) // 2
+    
+    return seq[start:start + target_length]
+
+
+def normalize_sequence(seq: str,) -> tuple[str, str | None]:
+    seq = seq.upper().strip()
+    length = len(seq)
+    warning = None
+
+    invalid_bases = set(seq) - VALID_BASES
+
+    if invalid_bases:
+        raise ValueError(f"Sequence contains invalid bases: {invalid_bases}")
+    
+    if length == SEQUENCE_LENGTH:
+        pass
+    elif length > SEQUENCE_LENGTH:
+        seq = trim_to_center(seq)
+        warning = (
+            f"Sequence was {length} bp — trimmed to center "
+            f"{SEQUENCE_LENGTH} bp window. "
+            f"Prediction is reliable."
+        )
+    elif length >= MIN_LENGTH:
+        seq = pad_sequence(seq)
+        warning = (
+            f"Sequence was {length} bp — padded to center "
+            f"{SEQUENCE_LENGTH} bp window. "
+            f"Prediction is less reliable."
+        )
+    else:
+        raise ValueError(
+            f"Sequence too short: {length} bp. "
+            f"Minimum accepted length is {MIN_LENGTH} bp. "
+            f"Model was trained on {SEQUENCE_LENGTH} bp sequences. "
+            f"Heavy padding below {MIN_LENGTH} bp produces unreliable predictions."
+        )
+
+    return seq, warning
+
+
 def shuffle_sequence(seq: str) -> str:
     seq_list = list(seq)
     np.random.shuffle(seq_list)
@@ -37,7 +91,7 @@ def validate_and_encode_batch(sequences: list[str]) -> tuple[np.ndarray, list[in
     encoded = []
     skipped = []
 
-    for i, seq in sequences:
+    for i, seq in enumerate(sequences):
         if not is_valid_sequence(seq):
             skipped.append(i)
             continue
