@@ -1,8 +1,12 @@
+import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi.routing import APIRouter
 from pydantic import BaseModel, field_validator
 from typing import Optional
 import time
+from io import StringIO
+from Bio import SeqIO
 from inference import load_model, predict_sequence, batch_predict
 from utils import SEQUENCE_LENGTH
 
@@ -31,6 +35,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+router = APIRouter(prefix="/api/v1")
 
 class SequenceRequest(BaseModel):
     sequence: str
@@ -85,7 +90,7 @@ def root():
     return {"message": "Promoter Sequence Classifier API is running. Visit /docs for the API documentation."}
 
 
-@app.get("/health")
+@router.get("/health")
 def health_check():
      return {
         "status": "ok",
@@ -95,7 +100,7 @@ def health_check():
     }
 
 
-@app.post("/classify", response_model=PredictionResponse)
+@router.post("/classify", response_model=PredictionResponse)
 def classify(request: SequenceRequest):
     if "model" not in model_store:
         raise HTTPException(
@@ -124,7 +129,7 @@ def classify(request: SequenceRequest):
         )
     
 
-@app.post("/batch_classify", response_model=BatchResponse)
+@router.post("/batch_classify", response_model=BatchResponse)
 def batch_classify(request: BatchRequest):
     if "model" not in model_store:
         raise HTTPException(
@@ -148,3 +153,88 @@ def batch_classify(request: BatchRequest):
             status_code=500,
             detail=f"Batch inference error: {str(e)}"
         )
+
+
+@router.post("/classify_file")
+async def classify_file(file: UploadFile = File(...)):
+    if "model" not in model_store:
+        raise HTTPException(status_code=503, detail="Model not loaded.")
+
+    allowed_extensions = {".fa", ".fasta", ".txt"}
+    filename = file.filename or "upload"
+    extension = os.path.splitext(filename)[-1].lower()
+
+    if extension not in allowed_extensions:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unsupported file type: {extension}. "
+                   f"Accepted: {allowed_extensions}"
+        )
+
+    try:
+        content = await file.read()
+        text = content.decode("utf-8")
+    except Exception as e:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Could not read file: {str(e)}"
+        )
+
+    try:
+        fasta_io  = StringIO(text)
+        records = list(SeqIO.parse(fasta_io, "fasta"))
+    except Exception as e:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Could not parse FASTA file: {str(e)}"
+        )
+
+    if len(records) == 0:
+        raise HTTPException(
+            status_code=422,
+            detail="No sequences found in file. Make sure it is valid FASTA format."
+        )
+
+    if len(records) > 100:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Too many sequences: {len(records)}. Maximum 100 per upload."
+        )
+
+    try:
+        start = time.perf_counter()
+        results = []
+
+        for i, record in enumerate(records):
+            seq = str(record.seq).upper().strip()
+            try:
+                result = predict_sequence(seq, model_store["model"])
+                result["index"] = i
+                result["record_id"] = str(record.id)
+                results.append(result)
+
+            except ValueError as e:
+                results.append({
+                    "index": i,
+                    "record_id": str(record.id),
+                    "label": "error",
+                    "message": str(e)
+                })
+
+        elapsed_ms = round((time.perf_counter() - start) * 1000, 2)
+
+        return {
+            "filename": filename,
+            "total": len(results),
+            "results": results,
+            "time_ms": elapsed_ms
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Inference error: {str(e)}"
+        )
+    
+
+app.include_router(router)
