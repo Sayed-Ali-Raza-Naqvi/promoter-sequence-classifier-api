@@ -1,214 +1,117 @@
-# Promoter Sequence Classifier API
+# Promoter Sequence Classifier
 
-A lightweight 1D CNN-based API for classifying DNA sequences as promoter or non-promoter using one-hot encoding. Built with PyTorch and FastAPI, it returns predictions with confidence scores from raw sequence input.
+A 1D CNN trained on EPDnew human promoter sequences that classifies
+600 bp DNA windows as **promoter** or **non-promoter** with a confidence score.
 
-## Features
+## Model Performance
 
-- **Fast Inference**: 1D Convolutional Neural Network optimized for DNA sequence classification
-- **REST API**: Built with FastAPI for easy integration
-- **Batch Processing**: Support for classifying multiple sequences in a single request
-- **Confidence Scores**: Returns prediction probabilities along with binary classifications
-- **Input Validation**: Validates DNA sequences (A, C, G, T only)
-- **Docker Ready**: Containerized deployment option
+| Metric         | Value  |
+|----------------|--------|
+| Test Accuracy  | 99.22% |
+| Test Loss      | 0.0288 |
+| Val Loss       | 0.0293 |
+| Best Epoch     | 19/30  |
+| Parameters     | 82,081 |
 
-## Model Details
+## Architecture
 
-- **Architecture**: 1D CNN with convolutional layers, max pooling, and fully connected layers
-- **Input**: 600 bp DNA sequences (one-hot encoded)
-- **Output**: Binary classification (promoter/non-promoter) with confidence scores
-- **Training Data**: EPDnew human promoter sequences
-- **Performance**: Trained to distinguish promoter regions from non-promoter DNA windows
+```
+Input (4, 600)
+→ Conv1d(4→32, k=11)  + BN + ReLU + MaxPool
+→ Conv1d(32→64, k=7)  + BN + ReLU + MaxPool
+→ Conv1d(64→128, k=7) + BN + ReLU + MaxPool
+→ GlobalAvgPool
+→ Dropout(0.5)
+→ FC(128→64) + ReLU
+→ FC(64→1) → Sigmoid
+```
+
+## Dataset
+
+- Source: EPDnew human promoters (https://epd.expasy.org)
+- Positives: ~29,000 real promoter sequences, 600 bp centered on TSS (-499 to +100)
+- Negatives: Shuffled promoter sequences (preserves nucleotide frequency, destroys positional signal)
+- Split: 80% train / 10% val / 10% test
+
+## Sequence Length Handling
+
+| Input Length  | Behavior                              | Reliability     |
+|---------------|---------------------------------------|-----------------|
+| == 600 bp     | Direct inference                      | Full            |
+| > 600 bp      | Trimmed to center 600 bp              | Full            |
+| 500–599 bp    | Padded symmetrically with N (zeros)   | Minor impact    |
+| < 500 bp      | Rejected — error returned             | Unreliable      |
 
 ## Training Curves
 
 ![Training Curves](models/training_curves.png)
 
-The model was trained for 30 epochs with early stopping based on validation loss. The training curves show the loss and accuracy progression over epochs.
+## Run Locally
 
-## Installation
-
-### Prerequisites
-
-- Python 3.8+
-- PyTorch 2.2+
-- CUDA (optional, for GPU acceleration)
-
-### Setup
-
-1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd promoter-sequence-classifier-api
-```
-
-2. Create a virtual environment:
-```bash
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-```
-
-3. Install dependencies:
-```bash
+# Install dependencies
+python -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
+
+# Train model (skip if cnn_promoter.pt already exists)
+cd src && python preprocess.py && python train.py
+
+# Start API
+cd api && uvicorn main:app --reload --port 8000
 ```
 
-4. Run the setup script (optional):
-```bash
-chmod +x setup.sh
-./setup.sh
-```
-
-## Usage
-
-### Running the API
-
-Start the FastAPI server:
+## Run with Docker
 
 ```bash
-cd api
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-The API will be available at `http://localhost:8000`
-
-### API Endpoints
-
-#### Health Check
-- **GET** `/health`
-- Returns the API status and model loading information
-
-#### Single Sequence Classification
-- **POST** `/classify`
-- **Body**:
-```json
-{
-  "sequence": "ATCGATCG..."
-}
-```
-- **Response**:
-```json
-{
-  "label": "promoter",
-  "confidence": 0.85,
-  "probability": 0.85,
-  "length": 600,
-  "time_ms": 12.34
-}
-```
-
-#### Batch Classification
-- **POST** `/batch_classify`
-- **Body**:
-```json
-{
-  "sequences": ["ATCG...", "GCTA..."]
-}
-```
-- **Response**:
-```json
-{
-  "total": 2,
-  "results": [
-    {
-      "label": "promoter",
-      "confidence": 0.85,
-      "probability": 0.85,
-      "length": 600
-    },
-    {
-      "label": "non-promoter",
-      "confidence": 0.92,
-      "probability": 0.08,
-      "length": 600
-    }
-  ],
-  "time_ms": 15.67
-}
-```
-
-### API Documentation
-
-Visit `http://localhost:8000/docs` for interactive API documentation powered by Swagger UI.
-
-## Training the Model
-
-To train the model from scratch:
-
-1. Prepare your data in the `data/processed/` directory:
-   - `X_train.npy`, `y_train.npy` (training data)
-   - `X_val.npy`, `y_val.npy` (validation data)
-   - `X_test.npy`, `y_test.npy` (test data)
-
-2. Run the training script:
-```bash
-cd src
-python train.py
-```
-
-The trained model will be saved as `models/cnn_promoter.pt` and training curves as `models/training_curves.png`.
-
-## Docker Deployment
-
-Build and run with Docker:
-
-```bash
+# Build
 docker build -t promoter-classifier .
+
+# Run
 docker run -p 8000:8000 promoter-classifier
 ```
 
-## Project Structure
+## API Endpoints
 
-```
-promoter-sequence-classifier-api/
-├── api/                    # FastAPI application
-│   ├── main.py            # API endpoints
-│   ├── inference.py       # Model inference logic
-│   └── __init__.py
-├── src/                    # Training and model code
-│   ├── model.py           # CNN architecture
-│   ├── train.py           # Training script
-│   ├── dataset.py         # Data loading
-│   ├── preprocess.py      # Data preprocessing
-│   ├── utils.py           # Utilities
-│   └── __init__.py
-├── data/                   # Data directory
-│   ├── raw/              # Raw data
-│   └── processed/        # Processed numpy arrays
-├── models/                # Trained models and plots
-│   ├── cnn_promoter.pt   # Trained model weights
-│   └── training_curves.png # Training visualization
-├── notebooks/             # Jupyter notebooks
-├── requirements.txt       # Python dependencies
-├── setup.sh              # Setup script
-├── Dockerfile            # Docker configuration
-└── README.md             # This file
+### POST /classify
+```bash
+curl -X POST http://localhost:8000/classify \
+  -H "Content-Type: application/json" \
+  -d '{"sequence": "ATCG...600bp"}'
 ```
 
-## Dependencies
-
-- torch==2.2.2
-- numpy==1.26.4
-- biopython==1.83
-- scikit-learn==1.4.2
-- matplotlib==3.8.4
-- fastapi==0.111.0
-- uvicorn==0.29.0
-- pydantic==2.7.1
-- requests==2.31.0
-- jupyter==1.0.0
-
-## License
-
-[Add your license here]
-
-## Contributing
-
-[Add contribution guidelines here]
-
-## Citation
-
-If you use this model in your research, please cite:
-
+Response:
+```json
+{
+  "label":             "promoter",
+  "confidence":        0.9981,
+  "probability":       0.9981,
+  "original_length":   600,
+  "processed_length":  600,
+  "warning":           null,
+  "time_ms":           4.21
+}
 ```
-[Add citation information]
+
+### POST /batch
+```bash
+curl -X POST http://localhost:8000/batch \
+  -H "Content-Type: application/json" \
+  -d '{"sequences": ["ATCG...600bp", "GCTA...600bp"]}'
 ```
+
+### GET /health
+```bash
+curl http://localhost:8000/health
+```
+
+## Interactive Docs
+```
+http://localhost:8000/docs
+```
+
+## Future Improvements
+- Sliding window inference for whole genome sequences
+- Attention visualization to highlight informative positions
+- Multi-species promoter support
+- ONNX export for faster CPU inference
