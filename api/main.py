@@ -38,7 +38,7 @@ class SequenceRequest(BaseModel):
     @field_validator("sequence")
     @classmethod
     def validate_sequence(cls, v: str) -> str:
-        v = v.upper().strip()
+        v = v.replace('\n', '').replace('\r', '').replace(' ', '').upper().strip()
         
         if len(v) == 0:
             raise ValueError("Sequence cannot be empty.")
