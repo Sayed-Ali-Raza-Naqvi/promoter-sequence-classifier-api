@@ -197,16 +197,6 @@ promoter-sequence-classifier-api/
 - requests==2.31.0
 - jupyter==1.0.0
 
-## License
-
-[Add your license here]
-
-## Contributing
-
-[Add contribution guidelines here]
-
-## Citation
-
 If you use this model in your research, please cite:
 
 ```
